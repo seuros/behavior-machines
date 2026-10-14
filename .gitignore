@@ -1,0 +1,21 @@
+/.bundle/
+/coverage/
+/doc/
+/pkg/
+/tmp/
+/target/
+
+Gemfile.lock
+*.log
+
+# Native extension build artifacts
+/ext/**/*.bundle
+/ext/**/*.so
+/ext/**/*.dSYM/
+/ext/**/Makefile
+/ext/**/target/
+lib/**/*.bundle
+lib/**/*.so
+
+# Cargo locks (library, not application)
+Cargo.lock
