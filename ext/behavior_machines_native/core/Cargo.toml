@@ -1,0 +1,25 @@
+[package]
+name = "behavior-machines"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license = "BSD-3-Clause"
+repository = "https://github.com/seuros/behavior-machines"
+description = "Behavior trees with explicit halt semantics - no_std, composes the state_machines ecosystem"
+keywords = ["behavior-tree", "ai", "no-std", "workflow", "state-machine"]
+categories = ["no-std", "algorithms", "game-development"]
+readme = "README.md"
+
+[features]
+# Leaves that drive a state-machines dynamic machine (`machine` module).
+state-machines = ["dep:state-machines"]
+
+[dependencies]
+state-machines = { version = ">=0.32", default-features = false, optional = true }
+thiserror = { version = "2.0.21", default-features = false }
+
+[package.metadata.docs.rs]
+all-features = true
+
+[lints]
+workspace = true
