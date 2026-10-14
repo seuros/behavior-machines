@@ -68,7 +68,8 @@ compiles them.
 Durations are seconds. The clock is an Integer count of nanoseconds, passed as
 `now:` and defaulting to `BehaviorMachines.now` (monotonic).
 `tree.next_deadline` returns when a running `sleep` or `timeout` next needs a
-tick, so a host can sleep until then.
+tick, so a host can sleep until then. A looping decorator that finished a run
+reports that tick's time, so its next run is due at once.
 
 ## Errors
 

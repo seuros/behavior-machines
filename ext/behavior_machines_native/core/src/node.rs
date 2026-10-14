@@ -12,6 +12,7 @@ use core::time::Duration;
 /// Decorators that loop (`Repeat`, `RetryUntilSuccessful`,
 /// `KeepRunningUntilFailure`) finish at most one run of their child per tick,
 /// so a child that finishes instantly cannot spin forever inside one tick.
+/// Between runs they are due at once by [`Tree::next_deadline`](crate::Tree::next_deadline).
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Node<L> {

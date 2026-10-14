@@ -441,7 +441,7 @@ module BehaviorMachines
     end
 
     # Repeat, RetryUntilSuccessful, and KeepRunningUntilFailure: at most one
-    # finished child run per tick.
+    # finished child run per tick; the next run is due at once.
     class LoopSlot < Slot
       def initialize(id, child, again_on, limit)
         super(id)
@@ -449,20 +449,28 @@ module BehaviorMachines
         @again_on = again_on
         @limit = limit
         @runs = 0
+        @due = nil
       end
 
       private
 
       def step(run, now, _starting)
+        @due = nil
         return @again_on if @limit&.zero?
 
         status = @child.tick(run, now)
         return status if status == :running
         return finish(status) unless status == @again_on
-        return :running if @limit.nil?
+        return again(now) if @limit.nil?
         return finish(status) if @runs + 1 == @limit
 
         @runs += 1
+        again(now)
+      end
+
+      # A run finished and the next waits for a tick: due at once.
+      def again(now)
+        @due = now
         :running
       end
 
@@ -476,7 +484,7 @@ module BehaviorMachines
         @runs = 0
       end
 
-      def running_deadline = @child.next_deadline
+      def running_deadline = earliest([@due, @child.next_deadline])
     end
   end
 end

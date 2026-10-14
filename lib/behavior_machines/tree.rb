@@ -53,7 +53,8 @@ module BehaviorMachines
       @engine.running?
     end
 
-    # The earliest time, in nanoseconds, a running Sleep or Timeout will fire.
+    # The earliest time, in nanoseconds, a running Sleep or Timeout will fire,
+    # or a looping decorator wants its next run (already due).
     def next_deadline
       check_idle
       @engine.next_deadline

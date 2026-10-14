@@ -229,6 +229,30 @@ fn halting_a_loop_halts_its_child_and_resets_the_count() {
 }
 
 #[test]
+fn loops_are_due_at_once_between_runs() {
+    let mut script = Script::default();
+    let mut tree = tree(parallel_all([
+        Node::sleep(MS(300)),
+        leaf("a").repeat(Limit::Times(2)),
+    ]));
+
+    // A running child leaves only the sleep's deadline.
+    assert_eq!(tree.tick(&mut script, at(5)), Running);
+    assert_eq!(tree.next_deadline(), Some(at(305)));
+
+    // A finished run makes the next one due at the tick that finished it.
+    script.set("a", Success);
+    assert_eq!(tree.tick(&mut script, at(7)), Running);
+    assert_eq!(tree.next_deadline(), Some(at(7)));
+
+    // The last run clears it.
+    assert_eq!(tree.tick(&mut script, at(9)), Running);
+    assert_eq!(tree.next_deadline(), Some(at(305)));
+    tree.halt(&mut script);
+    script.assert_idle();
+}
+
+#[test]
 fn unlimited_loops_do_not_count_runs() {
     // Seeds the counter instead of running 2^64 child runs; an unlimited loop
     // must keep going no matter how many runs came before.
@@ -239,15 +263,24 @@ fn unlimited_loops_do_not_count_runs() {
         script.set("a", again_on);
         let mut child = Slot::compile(leaf("a")).unwrap();
         let mut runs = usize::MAX;
+        let mut due = None;
         let mut run = Run {
             ctx: &mut script,
             observer: &mut (),
         };
 
         assert_eq!(
-            super::looped(&mut child, again_on, None, &mut runs, &mut run, at(0)),
+            super::looped(
+                &mut child,
+                again_on,
+                None,
+                &mut runs,
+                &mut due,
+                &mut run,
+                at(3)
+            ),
             Running
         );
-        assert_eq!(runs, usize::MAX);
+        assert_eq!((runs, due), (usize::MAX, Some(at(3))));
     }
 }

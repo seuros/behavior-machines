@@ -73,13 +73,14 @@ fn reached(deadline: Option<Time>, now: Time) -> bool {
 
 /// `Repeat`, `RetryUntilSuccessful`, and `KeepRunningUntilFailure`. A child
 /// run that ends with `again_on` counts toward `limit`; reaching it finishes
-/// with that status, otherwise the next run starts on the next tick. The
-/// other terminal status finishes immediately.
+/// with that status, otherwise the next run starts on the next tick, which
+/// `due` marks as already due. The other terminal status finishes immediately.
 pub(super) fn looped<L, C, O>(
     child: &mut Slot<L>,
     again_on: Status,
     limit: Option<usize>,
     runs: &mut usize,
+    due: &mut Option<Time>,
     run: &mut Run<'_, C, O>,
     now: Time,
 ) -> Status
@@ -88,6 +89,7 @@ where
     C: ?Sized,
     O: Observer + ?Sized,
 {
+    *due = None;
     if limit == Some(0) {
         return again_on;
     }
@@ -101,15 +103,21 @@ where
             }
             Some(_) => {
                 *runs += 1;
-                Status::Running
+                again(due, now)
             }
-            None => Status::Running,
+            None => again(due, now),
         },
         decisive => {
             *runs = 0;
             decisive
         }
     }
+}
+
+/// A run finished and the next waits for a tick: due at once.
+const fn again(due: &mut Option<Time>, now: Time) -> Status {
+    *due = Some(now);
+    Status::Running
 }
 
 #[cfg(test)]

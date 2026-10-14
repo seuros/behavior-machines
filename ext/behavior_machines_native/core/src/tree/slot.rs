@@ -76,6 +76,8 @@ enum Kind<L> {
         again_on: Status,
         limit: Option<usize>,
         runs: usize,
+        /// The tick that finished a run, while the next one waits for a tick.
+        due: Option<Time>,
     },
 }
 
@@ -140,7 +142,8 @@ impl<L> Slot<L> {
                 again_on,
                 limit,
                 runs,
-            } => decorator::looped(child, *again_on, *limit, runs, run, now),
+                due,
+            } => decorator::looped(child, *again_on, *limit, runs, due, run, now),
         };
         self.running = status == Status::Running;
         run.observer.ticked(self.id, status);
@@ -195,7 +198,7 @@ impl<L> Slot<L> {
         run.observer.halted(self.id);
     }
 
-    /// The earliest deadline of a running timed node in this subtree.
+    /// The earliest deadline of a running timed or looping node in this subtree.
     pub fn next_deadline(&self) -> Option<Time> {
         if !self.running {
             return None;
@@ -206,7 +209,8 @@ impl<L> Slot<L> {
             Kind::Timeout {
                 child, deadline, ..
             } => earliest([*deadline, child.next_deadline()]),
-            Kind::Map { child, .. } | Kind::Loop { child, .. } => child.next_deadline(),
+            Kind::Map { child, .. } => child.next_deadline(),
+            Kind::Loop { child, due, .. } => earliest([*due, child.next_deadline()]),
             Kind::Ordered { children, .. } | Kind::Parallel { children, .. } => {
                 earliest(children.iter().map(Self::next_deadline))
             }
@@ -397,6 +401,7 @@ impl Compiler {
             again_on,
             limit,
             runs: 0,
+            due: None,
         })
     }
 }

@@ -90,6 +90,24 @@ class DecoratorTest < Minitest::Test
     assert_equal 4, script.count(tick('a'))
   end
 
+  def test_loops_are_due_at_once_between_runs
+    script = Script.new
+    tree = tree(BM.parallel(BM.sleep(0.3), leaf('a').repeat(2)))
+
+    # A running child leaves only the sleep's deadline.
+    assert_equal :running, tree.tick(script, now: ms(5))
+    assert_equal ms(305), tree.next_deadline
+
+    # A finished run makes the next one due at the tick that finished it.
+    script.set('a', :success)
+    assert_equal :running, tree.tick(script, now: ms(7))
+    assert_equal ms(7), tree.next_deadline
+
+    # The last run clears it.
+    assert_equal :running, tree.tick(script, now: ms(9))
+    assert_equal ms(305), tree.next_deadline
+  end
+
   def test_looping_decorators_stop_on_the_other_status
     cases = {
       repeat: [->(node) { node.repeat(:unlimited) }, :failure],

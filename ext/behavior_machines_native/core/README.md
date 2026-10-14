@@ -22,7 +22,8 @@ and release them deterministically.
   - Leaves: your own, plus `Sleep`, `AlwaysSuccess`, `AlwaysFailure`.
 - **Deadlines**: `Tree::next_deadline` tells a sleeping host when a `Sleep` or
   `Timeout` needs the next tick.
-- **No spinning**: looping decorators finish at most one child run per tick.
+- **No spinning**: looping decorators finish at most one child run per tick,
+  and report the next run as already due through `Tree::next_deadline`.
 - **Observers**: `Tree::tick_observed` reports every node ticked or halted,
   by pre-order `NodeId`, for tracing and visualization.
 - **state-machines leaves** (feature `state-machines`): `machine::InState`,

@@ -38,8 +38,8 @@ pub enum BuildError {
 /// once before the call returns. See [`Leaf`] for the full contract.
 ///
 /// Time comes only from the `now` passed to each tick. A host that sleeps
-/// between ticks should wake by [`Tree::next_deadline`] so `Sleep` and
-/// `Timeout` nodes fire on time.
+/// between ticks should wake by [`Tree::next_deadline`] so `Sleep`, `Timeout`,
+/// and looping nodes act on time.
 ///
 /// After the root finishes, the next tick starts a fresh run.
 #[derive(Debug)]
@@ -105,9 +105,10 @@ impl<L> Tree<L> {
         self.root.running
     }
 
-    /// The earliest time a running `Sleep` or `Timeout` node will fire, if any.
-    /// Ticking at or after it lets that node act; leaves wake the host
-    /// through their own means.
+    /// The earliest time a running `Sleep` or `Timeout` node will fire, or a
+    /// looping decorator wants its next run (the time of the tick that
+    /// finished the last one, so already due), if any. Ticking at or after it
+    /// lets that node act; leaves wake the host through their own means.
     #[must_use]
     pub fn next_deadline(&self) -> Option<Time> {
         self.root.next_deadline()
