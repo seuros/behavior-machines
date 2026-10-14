@@ -1,0 +1,25 @@
+{
+  "plugins": [
+    "cargo-workspace"
+  ],
+  "packages": {
+    ".": {
+      "release-type": "ruby",
+      "package-name": "behavior_machines",
+      "bump-minor-pre-major": true,
+      "extra-files": [
+        "lib/behavior_machines/version.rb"
+      ],
+      "initial-version": "0.1.0"
+    },
+    "ext/behavior_machines_native/core": {
+      "release-type": "rust",
+      "package-name": "behavior-machines",
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        "README.md"
+      ],
+      "initial-version": "0.1.0"
+    }
+  }
+}
