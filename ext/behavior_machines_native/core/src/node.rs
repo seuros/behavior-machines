@@ -241,6 +241,78 @@ impl<L> Node<L> {
     pub fn keep_running_until_failure(self) -> Self {
         Self::KeepRunningUntilFailure(Box::new(self))
     }
+
+    /// The same definition with every leaf passed through `f`, in the
+    /// pre-order of [`NodeId`](crate::NodeId)s, so a host can number or count
+    /// its leaves.
+    pub fn map<M>(self, mut f: impl FnMut(L) -> M) -> Node<M> {
+        self.map_with(&mut f)
+    }
+
+    fn map_with<M, F: FnMut(L) -> M>(self, f: &mut F) -> Node<M> {
+        let mut boxed = |node: Box<Self>| Box::new(node.map_with(f));
+        match self {
+            Self::Leaf(leaf) => Node::Leaf(f(leaf)),
+            Self::AlwaysSuccess => Node::AlwaysSuccess,
+            Self::AlwaysFailure => Node::AlwaysFailure,
+            Self::Sleep(duration) => Node::Sleep(duration),
+            Self::Sequence(children) => Node::Sequence(map_all(children, f)),
+            Self::ReactiveSequence(children) => Node::ReactiveSequence(map_all(children, f)),
+            Self::Fallback(children) => Node::Fallback(map_all(children, f)),
+            Self::ReactiveFallback(children) => Node::ReactiveFallback(map_all(children, f)),
+            Self::Parallel {
+                children,
+                success,
+                failure,
+            } => Node::Parallel {
+                children: map_all(children, f),
+                success,
+                failure,
+            },
+            Self::IfThenElse {
+                condition,
+                then,
+                otherwise,
+            } => {
+                let condition = boxed(condition);
+                let then = boxed(then);
+                Node::IfThenElse {
+                    condition,
+                    then,
+                    otherwise: otherwise.map(boxed),
+                }
+            }
+            Self::WhileDoElse {
+                condition,
+                body,
+                otherwise,
+            } => {
+                let condition = boxed(condition);
+                let body = boxed(body);
+                Node::WhileDoElse {
+                    condition,
+                    body,
+                    otherwise: otherwise.map(boxed),
+                }
+            }
+            Self::Inverter(child) => Node::Inverter(boxed(child)),
+            Self::ForceSuccess(child) => Node::ForceSuccess(boxed(child)),
+            Self::ForceFailure(child) => Node::ForceFailure(boxed(child)),
+            Self::Timeout(limit, child) => Node::Timeout(limit, boxed(child)),
+            Self::Repeat(limit, child) => Node::Repeat(limit, boxed(child)),
+            Self::RetryUntilSuccessful(limit, child) => {
+                Node::RetryUntilSuccessful(limit, boxed(child))
+            }
+            Self::KeepRunningUntilFailure(child) => Node::KeepRunningUntilFailure(boxed(child)),
+        }
+    }
+}
+
+fn map_all<L, M, F: FnMut(L) -> M>(children: Vec<Node<L>>, f: &mut F) -> Vec<Node<M>> {
+    children
+        .into_iter()
+        .map(|child| child.map_with(f))
+        .collect()
 }
 
 /// The nodes that need at least one child, as reported by
@@ -271,3 +343,6 @@ impl fmt::Display for Composite {
         })
     }
 }
+
+#[cfg(test)]
+mod tests;
