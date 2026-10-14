@@ -1,5 +1,5 @@
 {
-  ".": "0.0.0",
-  "ext/behavior_machines_native/core": "0.0.0",
-  "ext/behavior_machines_native/ffi": "0.0.0"
+  ".": "0.1.0",
+  "ext/behavior_machines_native/core": "0.1.0",
+  "ext/behavior_machines_native/ffi": "0.1.1"
 }
