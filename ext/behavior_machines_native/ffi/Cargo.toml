@@ -1,0 +1,21 @@
+[package]
+name = "behavior_machines_native"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license = "BSD-3-Clause"
+description = "Ruby bindings for the behavior-machines engine"
+repository = "https://github.com/seuros/behavior-machines"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[lints]
+workspace = true
+
+[dependencies]
+behavior-machines = { path = "../core", version = "0.1.0" }
+magnus = "0.9.2"
+rb-sys = "0.9.130"
+
