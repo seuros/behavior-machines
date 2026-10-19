@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/seuros/behavior-machines/compare/behavior_machines/v0.2.0...behavior_machines/v0.3.0) (2026-10-19)
+
+
+### Features
+
+* add behavior-machines-circuit crate ([d066365](https://github.com/seuros/behavior-machines/commit/d066365048972d49ab41a09d668e62e3b9aaa407))
+
 ## [0.2.0](https://github.com/seuros/behavior-machines/compare/behavior_machines/v0.1.0...behavior_machines/v0.2.0) (2026-10-14)
 
 
