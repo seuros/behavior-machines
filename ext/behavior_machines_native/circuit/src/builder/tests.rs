@@ -1,0 +1,237 @@
+use super::*;
+
+/// One bit per input cell of `builder`.
+fn input_bits(builder: &Builder, count: u32) -> Vec<Bit> {
+    (0..count)
+        .map(|index| Bit::assume(builder.input(index)))
+        .collect()
+}
+
+/// `count` cells holding the bits of `assignment`, low bit first.
+fn cells(assignment: u32, count: u32) -> Vec<f32> {
+    (0..count)
+        .map(|index| f32::from(assignment >> index & 1 == 1))
+        .collect()
+}
+
+/// Builds over `inputs` bits, then evaluates the produced bit for every
+/// assignment of those inputs, so a construction is checked against its whole
+/// truth table rather than one case.
+fn truth_table(inputs: u32, build: impl FnOnce(&mut Builder, &[Bit]) -> Bit) -> Vec<bool> {
+    let mut builder = Builder::new(inputs);
+    let bits: Vec<Bit> = input_bits(&builder, inputs);
+    let result = build(&mut builder, &bits);
+    let circuit = builder.finish();
+
+    (0..1 << inputs)
+        .map(|assignment| {
+            let cells: Vec<f32> = cells(assignment, inputs);
+            let values = circuit.evaluate(&cells).expect("one cell per input");
+            result.form().value(&values) != 0.0
+        })
+        .collect()
+}
+
+#[test]
+fn not_is_free_and_correct() {
+    let builder = Builder::new(1);
+    let bit = Bit::assume(builder.input(0));
+    let before = builder.circuit().ops().len();
+    let _ = bit.not();
+    assert_eq!(
+        builder.circuit().ops().len(),
+        before,
+        "not appends no operation"
+    );
+
+    assert_eq!(
+        truth_table(1, |_, bits| bits[0].clone().not()),
+        [true, false]
+    );
+}
+
+#[test]
+fn and_or_follow_their_truth_tables() {
+    // Assignment order is (a, b) = 00, 01, 10, 11 with a the low bit.
+    assert_eq!(
+        truth_table(2, |builder, bits| builder.and(&bits[0], &bits[1])),
+        [false, false, false, true],
+    );
+    assert_eq!(
+        truth_table(2, |builder, bits| builder.or(&bits[0], &bits[1])),
+        [false, true, true, true],
+    );
+}
+
+#[test]
+fn or_disjoint_is_free() {
+    let builder = Builder::new(2);
+    let bits: Vec<Bit> = input_bits(&builder, 2);
+    let before = builder.circuit().ops().len();
+    let _ = Bit::or_disjoint(bits);
+    assert_eq!(
+        builder.circuit().ops().len(),
+        before,
+        "a disjoint or is addition"
+    );
+}
+
+#[test]
+fn is_zero_costs_one_operation_and_detects_zero() {
+    let mut builder = Builder::new(3);
+    let bits: Vec<Bit> = input_bits(&builder, 3);
+    let count = Count::of(bits);
+    let before = builder.circuit().ops().len();
+    let zero = builder.is_zero(&count);
+    assert_eq!(
+        builder.circuit().ops().len() - before,
+        1,
+        "testing a count against zero is a single rectified gate",
+    );
+
+    let circuit = builder.finish();
+    for assignment in 0..8 {
+        let cells: Vec<f32> = cells(assignment, 3);
+        let values = circuit.evaluate(&cells).expect("three cells");
+        let expected = assignment == 0;
+        assert_eq!(
+            zero.form().value(&values) != 0.0,
+            expected,
+            "assignment {assignment}"
+        );
+    }
+}
+
+#[test]
+fn at_least_counts_set_bits() {
+    for threshold in 0..=3 {
+        #[expect(clippy::cast_precision_loss, reason = "a tiny threshold")]
+        let wanted = threshold as f32;
+        let table = truth_table(3, |builder, bits| {
+            let count = Count::of(bits.to_vec());
+            builder.at_least(&count, wanted)
+        });
+        for (assignment, got) in table.iter().enumerate() {
+            let set = u32::try_from(assignment).expect("small").count_ones();
+            assert_eq!(
+                *got,
+                set >= threshold,
+                "at_least {threshold}, assignment {assignment}"
+            );
+        }
+    }
+}
+
+#[test]
+fn shortfall_is_the_complement_of_a_count() {
+    let builder = Builder::new(2);
+    let bits: Vec<Bit> = input_bits(&builder, 2);
+    let shortfall = Count::shortfall(2.0, bits);
+    let circuit = builder.finish();
+    let values = circuit.evaluate(&[1.0, 0.0]).expect("two cells");
+    assert_eq!(shortfall.form().value(&values), 1.0);
+}
+
+#[test]
+fn none_earlier_marks_positions_with_nothing_set_before_them() {
+    let mut builder = Builder::new(3);
+    let bits: Vec<Bit> = input_bits(&builder, 3);
+    let before = builder.circuit().ops().len();
+    let none_earlier = builder.none_earlier(&bits);
+    assert_eq!(
+        builder.circuit().ops().len() - before,
+        2,
+        "one gate per position, and the first has nothing to test",
+    );
+
+    let circuit = builder.finish();
+    for assignment in 0..8u32 {
+        let values = circuit
+            .evaluate(&cells(assignment, 3))
+            .expect("three cells");
+        for (index, bit) in none_earlier.iter().enumerate() {
+            let expected = (0..index).all(|earlier| assignment >> earlier & 1 == 0);
+            assert_eq!(
+                bit.form().value(&values) != 0.0,
+                expected,
+                "assignment {assignment}, position {index}",
+            );
+        }
+    }
+}
+
+#[test]
+fn none_earlier_with_the_bits_picks_exactly_the_first_one() {
+    // This is how an ordered composite finds the child that stopped the walk,
+    // so the one-hot property is the lowering's correctness, not a nicety.
+    let mut builder = Builder::new(3);
+    let bits: Vec<Bit> = input_bits(&builder, 3);
+    let none_earlier = builder.none_earlier(&bits);
+    let mut picked = Vec::new();
+    for (bit, none) in bits.iter().zip(&none_earlier) {
+        picked.push(builder.and(bit, none));
+    }
+    let circuit = builder.finish();
+
+    for assignment in 0..8u32 {
+        let values = circuit
+            .evaluate(&cells(assignment, 3))
+            .expect("three cells");
+        let set: Vec<bool> = picked
+            .iter()
+            .map(|bit| bit.form().value(&values) != 0.0)
+            .collect();
+        assert_eq!(
+            set.iter().position(|chosen| *chosen),
+            (0..3).find(|index| assignment >> index & 1 == 1),
+            "assignment {assignment} picked {set:?}",
+        );
+        assert!(
+            set.iter().filter(|chosen| **chosen).count() <= 1,
+            "the selection must be one-hot"
+        );
+    }
+}
+
+#[test]
+fn constants_fold_without_appending_operations() {
+    let mut builder = Builder::new(1);
+    let before = builder.circuit().ops().len();
+
+    assert_eq!(
+        builder.is_zero(&Count::constant(0.0)).as_constant(),
+        Some(true)
+    );
+    assert_eq!(
+        builder.is_zero(&Count::constant(2.0)).as_constant(),
+        Some(false)
+    );
+    assert_eq!(
+        builder.at_least(&Count::constant(2.0), 2.0).as_constant(),
+        Some(true)
+    );
+    assert_eq!(
+        builder
+            .and(&Bit::constant(true), &Bit::constant(true))
+            .as_constant(),
+        Some(true)
+    );
+    assert_eq!(
+        builder
+            .and(&Bit::constant(false), &Bit::constant(true))
+            .as_constant(),
+        Some(false)
+    );
+    assert_eq!(
+        builder
+            .or(&Bit::constant(false), &Bit::constant(false))
+            .as_constant(),
+        Some(false)
+    );
+
+    assert_eq!(
+        builder.circuit().ops().len(),
+        before,
+        "folding must not emit anything"
+    );
+}

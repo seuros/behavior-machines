@@ -1,5 +1,9 @@
 [workspace]
-members = ["ext/behavior_machines_native/core", "ext/behavior_machines_native/ffi"]
+members = [
+    "ext/behavior_machines_native/circuit",
+    "ext/behavior_machines_native/core",
+    "ext/behavior_machines_native/ffi",
+]
 resolver = "3"
 
 [workspace.package]
